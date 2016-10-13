@@ -21,6 +21,47 @@ $ ->
         $tab.addClass('hidden').hide().addClass('hidden')
         $addButton.show().removeClass('hidden')
 
+    replaceIndexInAttr = (element, attr, wrongValue, correctValue) ->
+      oldValue = element.attr(attr)
+      element.attr(attr, oldValue.replace(wrongValue, correctValue)) if oldValue
+      return true
+
+    # Merges separate translated_inputs blocks into one in order for them to work properly
+    mergeTranslationFieldsets = ->
+      $translatedFields = $('fieldset.inputs.translated-fields')
+      return if $translatedFields.length <= 1
+
+      mainFieldsetsForLocales = $translatedFields.first()
+      .find('fieldset.inputs.locale').toArray().reduce((res, element) ->
+        res[element.className.match(/locale-[a-z]{2}/)[0].replace('locale-', '')] = $(element).find('ol')[0]
+        res
+      , {})
+
+      for secondary_fieldset in $translatedFields[1..]
+        for locale in Object.keys(mainFieldsetsForLocales)
+          $mainFieldset = $(mainFieldsetsForLocales[locale])
+          $inputs_for_locale = $(secondary_fieldset).find('fieldset.inputs.locale.locale-' + locale + ' ol')
+
+          # We don't want to move the hidden inputs
+          $inputs_for_locale.find(':input:not([type=hidden])').appendTo(mainFieldsetsForLocales[locale])
+
+          # The moved inputs have wrong indices in their input names
+          correctFieldsetIndex = $mainFieldset.find("input[type='hidden']").attr('id').match(/[0-9]+/)[0]
+          wrongFieldsetIndex = $inputs_for_locale.find("input[type='hidden']").attr('id').match(/[0-9]+/)[0]
+
+          # We only need to update the names
+          $mainFieldset.find(':input').each((i, e) -> replaceIndexInAttr $(e), 'name', wrongFieldsetIndex, correctFieldsetIndex)
+
+          # The submit handler will remove any 'hidden' languages from the request.
+          # We need to check if the main fieldset tab has some data after merging,
+          # and show the tab in order not to strip that language.
+          $mainFieldset.find(':input:not([type=hidden])').each((i, e) ->
+            $tab = $('li:not(.add-locale) > a[href=".locale-' + locale + '"]')
+            $tab.removeClass('hidden').show() if $(e).val()
+          )
+
+        $(secondary_fieldset).remove()
+
     $(".activeadmin-translations > ul").each ->
       $dom = $(this)
       # true when tabs are used in show action, false in form
@@ -108,6 +149,9 @@ $ ->
         if !$form.data('ready')
           $form.data('ready')
           $form.submit ->
+            # Merge separate fieldsets so that multiple translated_fields work together
+            mergeTranslationFieldsets()
+
             # Get all translations (the nested ones too).
             $('.activeadmin-translations > ul').each ->
               # Get the corresponding fieldsets.
