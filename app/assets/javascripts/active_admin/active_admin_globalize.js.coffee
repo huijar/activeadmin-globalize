@@ -39,6 +39,11 @@ $ ->
 
       for secondary_fieldset in $translatedFields[1..]
         for locale in Object.keys(mainFieldsetsForLocales)
+          # If all of the locale's tabs are hidden, we'll want the submit handler
+          # to destroy them as usual.
+          allLocaleTabsHidden = $('.available-locales > li:not(".add-locale") > a[href=".locale-' + locale + '"]:not(.hidden)').length == 0
+          continue if allLocaleTabsHidden
+
           $mainFieldset = $(mainFieldsetsForLocales[locale])
           $inputs_for_locale = $(secondary_fieldset).find('fieldset.inputs.locale.locale-' + locale + ' ol')
 
